@@ -13,6 +13,21 @@ function isEnglishStandard(caption) {
     return (caption.snippet.trackKind == 'standard' && caption.snippet.language == 'en');
 }
 
+function get_channel_ID(username, callback) {
+    var options = {
+        method: 'GET',
+        url: channels_url,
+        qs: {
+            part: 'id',
+            forUsername: username,
+            key: api_key
+        },
+        json: true
+    };
+    // console.log(JSON.stringify(options));
+    request(options, callback);
+}
+
 function get_caption_details(videoId, callback) {
     var options = {
         method: 'GET',
@@ -78,95 +93,69 @@ function get_english_caption(videoId, callback) {
     ], callback);
 }
 
-function channel_scan(username) {
-    // id: 'UCvQECJukTDE2i6aCoMnS-Vg',
-    async.waterfall([
-        function(cb) {
-            var options = {
-                method: 'GET',
-                url: channels_url,
-                qs: {
-                    part: 'contentDetails',
-                    forUsername: username,
-                    key: api_key
-                },
-                json: true
-            };
-            request(options, cb);
-        },
-        function(response, body, cb) {
-            var options = {
-                method: 'GET',
-                url: playlistItems_url,
-                qs: {
-                    part: 'contentDetails',
-                    playlistId: body.items[0].contentDetails.relatedPlaylists.uploads,
-                    maxResults: 50,
-                    key: api_key
-                },
-                json: true
-            };
-            request(options, cb);
-        },
-        function(response, body, cb) {
-            async.each(body.items, function(video, cbe) {
-                var options = {
-                    method: 'GET',
-                    url: captions_url,
-                    qs: {
-                        part: 'id',
-                        videoId: video.contentDetails.videoId,
-                        key: api_key
-                    }
-                };
-                request(options, function(err, resp, bod) {
-                    console.log(bod);
-                    cbe();
-                    // cbe(null, bod);
+function search_youtube(params, amount, callback) {
+    async.whilst(()=>amount > 0, function(cbwhilst) {
+        var options = {
+            method: 'GET',
+            url: search_url,
+            qs: {
+                // q: query,
+                // pageToken: 'CDIQAA',
+                part: 'id', // Or snippet
+                maxResults: ((amount > 50)?50:amount),
+                safeSearch: "none",
+                type: "video",
+                videoCaption: "closedCaption",
+                key: api_key
+            },
+            json: true
+        };
+        async.waterfall([
+            function(cbw) {
+                if(!params.channelId) {
+                    if(!params.username)
+                        throw new Error("channelId or username required");
+                    get_channel_ID(params.username, cbw);
+                }
+                else
+                    cbw(null, null, null);
+            },
+            function(respc, bodc, cbw) {
+                if(bodc) {
+                    delete params.username;
+                    params.channelId = bodc.items[0].id;
+                }
+                for(key in params)
+                    options.qs[key] = params[key];
+                request(options, cbw);
+            },
+            function(respv, bodv, cbw) {
+                // console.log(JSON.stringify(bodv, null, 2));
+                async.each(bodv.items, function(item, cbe) {
+                    get_english_caption(item.id.videoId, cbe);
+                }, function(err, data) {
+                    if(err) console.log(err);
+                    cbw(null, bodv);
                 });
-            }, cb);
-        }
-    ]);
-}
-
-function search(params) {
-    var options = {
-        method: 'GET',
-        url: search_url,
-        qs: {
-            // q: query,
-            // pageToken: 'CDIQAA',
-            part: 'snippet',
-            maxResults: 50,
-            safeSearch: "none",
-            type: "video",
-            videoCaption: "closedCaption",
-            key: api_key
-        },
-        json: true
-    };
-    for(key in params)
-        options.qs[key] = params[key];
-    
-    async.waterfall([
-        function(cbw) {
-            request(options, cbw);
-        },
-        function(respv, bodv, cbw) {
-            async.each(bodv.items, function(item, cbe) {
-                get_english_caption(item.id.videoId, cbe);
-            }, function(err, data) {
-                if(err) console.log(err);
-                cbw(null, bodv);
-            });
-        }
-    ], function(err, data) {
-        console.log("\nNext Page: " + data.nextPageToken);
+            }
+        ], function(err, data) {
+            amount -= 50;
+            console.log("\nNext Page: " + data.nextPageToken);
+            params.pageToken = data.nextPageToken;
+            cbwhilst(err);
+        });
+    }, function(err) {
+        if(callback)
+            callback(err);
     });
 }
 
-// channel_scan("bigthink");
-search({ 
-    channelId: "UCvQECJukTDE2i6aCoMnS-Vg",
-    pageToken: 'CDIQAA'
-});
+    // channelId: "UCvQECJukTDE2i6aCoMnS-Vg", // bigthink
+    // channelId: 'UC9-y-6csu5WGm29I7JiwpnA', // Computerphile
+    // channelId: 'UCIsp57CkuqoPQyHP2B2Y5NA', // MillBeeful
+search_youtube({
+    username: "bigthink",
+    order: "date",
+    // pageToken: 'CDIQAA'
+    // q: "after the unemployment rate declines below"
+}, 1000, null);
