@@ -9,9 +9,7 @@ var captions_url = "https://www.googleapis.com/youtube/v3/captions";
 var search_url = "https://www.googleapis.com/youtube/v3/search";
 var timedtext_url = "https://www.youtube.com/api/timedtext";
 
-function isEnglishStandard(caption) {
-    return (caption.snippet.trackKind == 'standard' && caption.snippet.language == 'en');
-}
+var allowASR = false;
 
 function get_channel_ID(username, callback) {
     var options = {
@@ -67,9 +65,26 @@ function get_english_caption(videoId, callback) {
             });
         },
         function(captions, cbw) {
-            async.detect(captions, async.asyncify(isEnglishStandard), cbw);
+            var asr_alt = null;
+            async.detect(captions, function(caption) {
+                if(caption.snippet.language == 'en') {
+                    if(caption.snippet.trackKind == 'standard')
+                        return true;
+                    else // if(caption.snippet.trackKind == 'ASR')
+                        asr_alt = caption;
+                }
+                return false;
+            }, function(err, result) {
+                if(result)
+                    cbw(err, result);
+                else if(allowASR)
+                    cbw(err, asr_alt);
+                else
+                    cbw(null, null);
+            });
         },
         function(english_caption, cbw) {
+
             var params = {
                 v: videoId
             };
@@ -79,7 +94,7 @@ function get_english_caption(videoId, callback) {
                 // console.log(JSON.stringify(english_caption));
                 if(english_caption.snippet.name != '')
                     params.name = english_caption.snippet.name;
-                    
+                
                 get_caption_content(params, function(errc, respc, bodc) {
                     if(errc) console.log(errc);
                     console.log("\n=============================================================\n");
@@ -105,7 +120,7 @@ function search_youtube(params, amount, callback) {
                 maxResults: ((amount > 50)?50:amount),
                 safeSearch: "none",
                 type: "video",
-                videoCaption: "closedCaption",
+                videoCaption: allowASR?"any":"closedCaption",
                 key: api_key
             },
             json: true
@@ -152,11 +167,14 @@ function search_youtube(params, amount, callback) {
     });
 }
 
-    // channelId: "UCvQECJukTDE2i6aCoMnS-Vg", // bigthink
-    // channelId: 'UC9-y-6csu5WGm29I7JiwpnA', // Computerphile
-    // channelId: 'UCIsp57CkuqoPQyHP2B2Y5NA', // MillBeeful
+// channelId: "UCvQECJukTDE2i6aCoMnS-Vg", // bigthink
+// channelId: 'UC9-y-6csu5WGm29I7JiwpnA', // Computerphile
+// channelId: 'UCIsp57CkuqoPQyHP2B2Y5NA', // MillBeeful
+
+allowASR = false;
+
 search_youtube({
-    username: "numberphile",
+    username: "bigthink",
     order: "date",
     // pageToken: 'CDIQAA'
     // q: "after the unemployment rate declines below"
