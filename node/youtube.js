@@ -142,6 +142,8 @@ function search_youtube(params, amount, callback) {
             amount -= 50;
             console.log("\nNext Page: " + data.nextPageToken);
             params.pageToken = data.nextPageToken;
+            if(!params.pageToken)
+                amount = 0;
             cbwhilst(err);
         });
     }, function(err) {
@@ -154,7 +156,7 @@ function search_youtube(params, amount, callback) {
     // channelId: 'UC9-y-6csu5WGm29I7JiwpnA', // Computerphile
     // channelId: 'UCIsp57CkuqoPQyHP2B2Y5NA', // MillBeeful
 search_youtube({
-    username: "bigthink",
+    username: "numberphile",
     order: "date",
     // pageToken: 'CDIQAA'
     // q: "after the unemployment rate declines below"
