@@ -8,8 +8,36 @@ var playlistItems_url = "https://www.googleapis.com/youtube/v3/playlistItems";
 var captions_url = "https://www.googleapis.com/youtube/v3/captions";
 var search_url = "https://www.googleapis.com/youtube/v3/search";
 var timedtext_url = "https://www.youtube.com/api/timedtext";
+var youtube_url = "https://www.youtube.com/watch";
 
 var allowASR = false;
+
+function get_asr_captions(videoId, callback) {
+    var options = {
+        method: 'GET',
+        url: youtube_url,
+        qs: {
+            v: videoId
+        }
+    };
+    async.waterfall([
+        async.apply(request, options), //request(options, callback);
+        function(respyt, bodyt, cbw) {
+            // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]+)"/);
+            // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr[^"]*)"/);
+            var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr.*?)\\u\d+.*"/);
+            if (results)
+                cbw(null, decodeURIComponent(results[1]));
+            else
+                cbw("Couldn't Find any ASR tracks");
+        }
+    ], function(err, asr_url) {
+        request({
+            method: 'GET',
+            url: asr_url
+        }, callback);
+    });
+}
 
 function get_channel_ID(username, callback) {
     var options = {
@@ -60,24 +88,28 @@ function get_english_caption(videoId, callback) {
         function(cbw) {
             get_caption_details(videoId, function(errcd, respcd, bodcd) {
                 if(errcd) console.log(errcd);
-                // console.log(JSON.stringify(bodcd) + '\n');
+                // console.log(JSON.stringify(bodcd, null, 2));
                 cbw(null, bodcd.items);
             });
         },
         function(captions, cbw) {
             var asr_alt = null;
-            async.detect(captions, function(caption) {
+            async.detect(captions, function(caption, cbt) {
                 if(caption.snippet.language == 'en') {
                     if(caption.snippet.trackKind == 'standard')
-                        return true;
-                    else // if(caption.snippet.trackKind == 'ASR')
+                        cbt(true);
+                    else { // if(caption.snippet.trackKind == 'ASR')
                         asr_alt = caption;
+                        cbt(false);
+                    }
                 }
-                return false;
+                else
+                    cbt(false);
+
             }, function(err, result) {
                 if(result)
                     cbw(err, result);
-                else if(allowASR)
+                else if(allowASR && asr_alt)
                     cbw(err, asr_alt);
                 else
                     cbw(null, null);
@@ -90,14 +122,24 @@ function get_english_caption(videoId, callback) {
             };
             if(!english_caption)
                 cbw(`\n\n\n\n\n\n\n\n+++++++++++++\nNo English Captions\n+++++++++++++++\n${videoId}\n\n\n\n\n\n\n`);
-            else {
-                // console.log(JSON.stringify(english_caption));
+            else if(english_caption.trackKind == "standard"){
+                // console.log("Captions: "  + JSON.stringify(english_caption));
                 if(english_caption.snippet.name != '')
                     params.name = english_caption.snippet.name;
                 
                 get_caption_content(params, function(errc, respc, bodc) {
                     if(errc) console.log(errc);
                     console.log("\n=============================================================\n");
+                    console.log(videoId + '\n');
+                    console.log(bodc);
+                    // cbw(null, bodc);
+                    cbw(null);
+                });
+            }
+            else if(allowASR) {
+                get_asr_captions(videoId, function(errc, respc, bodc) {
+                    if(errc) console.log(errc);
+                    console.log("\n============================ASR==============================\n");
                     console.log(videoId + '\n');
                     console.log(bodc);
                     // cbw(null, bodc);
@@ -125,6 +167,7 @@ function search_youtube(params, amount, callback) {
             },
             json: true
         };
+        console.log(JSON.stringify(options, null, 2));
         async.waterfall([
             function(cbw) {
                 if(!params.channelId) {
@@ -171,11 +214,11 @@ function search_youtube(params, amount, callback) {
 // channelId: 'UC9-y-6csu5WGm29I7JiwpnA', // Computerphile
 // channelId: 'UCIsp57CkuqoPQyHP2B2Y5NA', // MillBeeful
 
-allowASR = false;
+allowASR = true;
 
 search_youtube({
-    username: "bigthink",
+    username: "JoergSprave",
     order: "date",
     // pageToken: 'CDIQAA'
     // q: "after the unemployment rate declines below"
-}, 1000, null);
+}, 1, null);
