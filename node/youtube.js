@@ -1,5 +1,9 @@
 var request = require("request");
 var async = require("async");
+var sprintf = require("sprintf-js").sprintf;
+var xml2js = require("xml2js");
+var cheerio = require("cheerio");
+var node_vtt = new require("node-vtt")();
 
 var api_key = "AIzaSyA7B2nB1Vf9qDp8WTudwBvvbd1Oz2123-A";
 
@@ -8,10 +12,52 @@ var playlistItems_url = "https://www.googleapis.com/youtube/v3/playlistItems";
 var captions_url = "https://www.googleapis.com/youtube/v3/captions";
 var search_url = "https://www.googleapis.com/youtube/v3/search";
 var timedtext_url = "https://www.youtube.com/api/timedtext";
+var youtube_url = "https://www.youtube.com/watch";
+
+var webvtt_baseURL = "https://manifest.googlevideo.com/api/manifest/webvtt"
 
 function isEnglishStandard(caption) {
     return (caption.snippet.trackKind == 'standard' && caption.snippet.language == 'en');
 }
+
+function get_livestream_caption_feed(videoId, callback) {
+    var options = {
+        method: 'GET',
+        url: youtube_url,
+        qs: {
+            v: videoId
+        }
+    }
+    async.waterfall([
+        async.apply(request, options),
+        function(resps, bods, cbw) {
+            var results = bods.match(/"\s*dashmpd\s*"\s*:\s*"\s*(https[^"]*)"/);
+            if(results)
+                cbw(null, results[1].replace(/\\\//g, "/")); // TODO: Properly unescape characters
+            else
+                cbw("Couldn't Find dashmpd to connect to caption stream");
+        },
+        function(dashmpd_url, cbw) {
+            console.log(dashmpd_url + "\n");
+            request({
+                method: 'GET',
+                url: dashmpd_url
+            }, cbw);
+        },
+        function(respd, bodd, cbw) {
+            // console.log(bodd);
+            var $ = cheerio.load(bodd);
+            var originalURL = $('AdaptationSet[mimeType="text/vtt"] BaseURL').text();
+            var path_params_str = originalURL.replace(webvtt_baseURL, "");
+            var querystring = path_params_str.replace(/\/([^\/]+)\/([^\/]+)/g, "$1=$2&").replace(/^[\/&]*(.*?)[\/&]*$/, "$1");
+            // console.log("\n" + originalURL);
+            // console.log("\n" + querystring);
+            cbw(null, sprintf("%s?%s", webvtt_baseURL, querystring));
+            // xml2js.parseString(bodd, cbw);
+        }
+    ], callback);
+}
+
 
 function get_channel_ID(username, callback) {
     var options = {
@@ -93,7 +139,7 @@ function get_english_caption(videoId, callback) {
     ], callback);
 }
 
-function search_youtube(params, amount, callback) {
+function search_youtube(params, amount, displayCaptions, callback) {
     async.whilst(()=>amount > 0, function(cbwhilst) {
         var options = {
             method: 'GET',
@@ -105,16 +151,13 @@ function search_youtube(params, amount, callback) {
                 maxResults: ((amount > 50)?50:amount),
                 safeSearch: "none",
                 type: "video",
-                videoCaption: "closedCaption",
                 key: api_key
             },
             json: true
         };
         async.waterfall([
             function(cbw) {
-                if(!params.channelId) {
-                    if(!params.username)
-                        throw new Error("channelId or username required");
+                if(!params.channelId && params.username) {
                     get_channel_ID(params.username, cbw);
                 }
                 else
@@ -127,22 +170,29 @@ function search_youtube(params, amount, callback) {
                 }
                 for(key in params)
                     options.qs[key] = params[key];
+
+                console.log(JSON.stringify(options, null, 2) + "\n++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n");
                 request(options, cbw);
             },
             function(respv, bodv, cbw) {
                 // console.log(JSON.stringify(bodv, null, 2));
-                async.each(bodv.items, function(item, cbe) {
-                    get_english_caption(item.id.videoId, cbe);
-                }, function(err, data) {
-                    if(err) console.log(err);
+                if(displayCaptions) {
+                    async.each(bodv.items, function(item, cbe) {
+                        get_english_caption(item.id.videoId, cbe);
+                    }, function(err, data) {
+                        if(err) console.log(err);
+                        cbw(null, bodv);
+                    });
+                }
+                else
                     cbw(null, bodv);
-                });
             }
         ], function(err, data) {
             amount -= 50;
+            console.log(JSON.stringify(data, null, 2));
             console.log("\nNext Page: " + data.nextPageToken);
             params.pageToken = data.nextPageToken;
-            if(!params.pageToken)
+            if(!params.pageToken || data.items.length == 0)
                 amount = 0;
             cbwhilst(err);
         });
@@ -155,9 +205,13 @@ function search_youtube(params, amount, callback) {
     // channelId: "UCvQECJukTDE2i6aCoMnS-Vg", // bigthink
     // channelId: 'UC9-y-6csu5WGm29I7JiwpnA', // Computerphile
     // channelId: 'UCIsp57CkuqoPQyHP2B2Y5NA', // MillBeeful
-search_youtube({
-    username: "numberphile",
-    order: "date",
-    // pageToken: 'CDIQAA'
-    // q: "after the unemployment rate declines below"
-}, 1000, null);
+// search_youtube({
+//     // videoCaption: "closedCaption",
+//     username: "HSN",
+//     order: "date",
+//     eventType: "live"
+//     // pageToken: 'CDIQAA'
+//     // q: "HSN Livestream"
+// }, 1000, false, null);
+
+get_livestream_caption_feed("uixUv3Ydwt0", (err, data) => console.log(data));
