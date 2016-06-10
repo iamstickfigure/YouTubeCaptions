@@ -20,7 +20,7 @@ function isEnglishStandard(caption) {
     return (caption.snippet.trackKind == 'standard' && caption.snippet.language == 'en');
 }
 
-function get_livestream_caption_feed(videoId, callback) {
+function get_livestream_feed(videoId, callback) {
     var options = {
         method: 'GET',
         url: youtube_url,
@@ -37,27 +37,53 @@ function get_livestream_caption_feed(videoId, callback) {
             else
                 cbw("Couldn't Find dashmpd to connect to caption stream");
         },
-        function(dashmpd_url, cbw) {
-            console.log(dashmpd_url + "\n");
+    ], callback);
+}
+
+function get_live_captions(live_feed_url, callback) {
+    async.waterfall([
+        function(cbw) {
+            console.log(live_feed_url + "\n");
             request({
                 method: 'GET',
-                url: dashmpd_url
+                url: live_feed_url
             }, cbw);
         },
         function(respd, bodd, cbw) {
             // console.log(bodd);
             var $ = cheerio.load(bodd);
-            var originalURL = $('AdaptationSet[mimeType="text/vtt"] BaseURL').text();
-            var path_params_str = originalURL.replace(webvtt_baseURL, "");
-            var querystring = path_params_str.replace(/\/([^\/]+)\/([^\/]+)/g, "$1=$2&").replace(/^[\/&]*(.*?)[\/&]*$/, "$1");
+            var adaptation_set = $('AdaptationSet[mimeType="text/vtt"]');
+            var originalURL = $('BaseURL', adaptation_set).text();
+            var segments = $('SegmentURL', adaptation_set);
+
+            // console.log(segments.attr("media"));
+            var sqs = [];
+            segments.each(function() {
+                sqs.push($(this).attr("media"));
+            });
+            cbw(null, {
+                baseURL: originalURL,
+                sq: sqs
+            });
+
+            // var path_params_str = originalURL.replace(webvtt_baseURL, "");
+            // var querystring = path_params_str.replace(/\/([^\/]+)\/([^\/]+)/g, "$1=$2&").replace(/^[\/&]*(.*?)[\/&]*$/, "$1");
             // console.log("\n" + originalURL);
             // console.log("\n" + querystring);
-            cbw(null, sprintf("%s?%s", webvtt_baseURL, querystring));
-            // xml2js.parseString(bodd, cbw);
+            // cbw(null, sprintf("%s?%s", originalURL, querystring));
         }
     ], callback);
 }
 
+function get_live_caption_content(baseURL, sq, callback) {
+    if(typeof sq == "number")
+        sq = `sq/${sq}`;
+    var options = {
+        method: 'GET',
+        url: `${baseURL}${sq}`
+    }
+    request(options, callback);
+}
 
 function get_channel_ID(username, callback) {
     var options = {
@@ -214,4 +240,27 @@ function search_youtube(params, amount, displayCaptions, callback) {
 //     // q: "HSN Livestream"
 // }, 1000, false, null);
 
-get_livestream_caption_feed("uixUv3Ydwt0", (err, data) => console.log(data));
+// get_livestream_feed("uixUv3Ydwt0", function(err, data) {
+//     console.log(data);
+// });
+
+var feed_url = "https://manifest.googlevideo.com/api/manifest/dash/id/uixUv3Ydwt0.2/sparams/as%2Cgcr%2Chfr%2Cid%2Cip%2Cipbits%2Citag%2Cplaylist_type%2Crequiressl%2Csource%2Cexpire/requiressl/yes/key/yt6/gcr/us/expire/1465612957/playlist_type/LIVE/signature/9C74AA542E33A4D96644375DA0A0AEB1CD88C583.25C00E00C153D106A1E478572F59A783653CAFD2/sver/3/fexp/9416126%2C9416891%2C9417580%2C9422596%2C9425569%2C9427768%2C9428398%2C9428520%2C9431012%2C9433092%2C9433096%2C9433380%2C9433425%2C9433946%2C9434087%2C9435188%2C9435252%2C9435526%2C9435780%2C9435876%2C9436102%2C9436275%2C9436998%2C9437066%2C9437283%2C9437552%2C9438657%2C9438955%2C9438965/ip/107.1.143.3/upn/4B9twh7r4GM/source/yt_live_broadcast/itag/0/ipbits/0/as/fmp4_audio_clear%2Cwebm_audio_clear%2Cwebm2_audio_clear%2Cfmp4_sd_hd_clear%2Cwebm2_sd_hd_clear/hfr/1";
+
+get_live_captions(feed_url, function(err, data) {
+    console.log(JSON.stringify(data, null, 2));
+    // async.eachSeries(data.sq, function(item, cbe) {
+    //     get_live_caption_content(data.baseURL, item, function(err, respc, bodc) {
+    //         console.log(bodc);
+    //         cbe();
+    //     });
+    // });
+
+    var sq = 0;
+    async.whilst(()=>sq < 1000, function(cbwhilst) {
+        get_live_caption_content(data.baseURL, sq, function(err, respc, bodc) {
+            console.log(bodc);
+            sq++;
+            cbwhilst(null);
+        });
+    });
+});
