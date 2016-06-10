@@ -255,12 +255,17 @@ get_live_captions(feed_url, function(err, data) {
     //     });
     // });
 
-    var sq = 0;
-    async.whilst(()=>sq < 1000, function(cbwhilst) {
+    // var captions = [];
+    // var sq = 0;
+    // async.whilst(()=>sq < 1000, function(cbwhilst) {
+    async.times(1000, function(sq, cbt) {
         get_live_caption_content(data.baseURL, sq, function(err, respc, bodc) {
-            console.log(bodc);
-            sq++;
-            cbwhilst(null);
+            cbt(err, bodc);
+            // console.log(bodc);
+            // sq++;
+            // cbwhilst(null);
         });
+    }, function(err, captions) {
+        console.log(captions);
     });
 });
