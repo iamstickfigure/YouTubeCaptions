@@ -1,6 +1,7 @@
 var request = require("request");
 var async = require("async");
 var sprintf = require("sprintf-js").sprintf;
+var sscanf = require("scanf").sscanf;
 var xml2js = require("xml2js");
 var cheerio = require("cheerio");
 var node_vtt = new require("node-vtt")();
@@ -43,7 +44,7 @@ function get_livestream_feed(videoId, callback) {
 function get_live_captions(live_feed_url, callback) {
     async.waterfall([
         function(cbw) {
-            console.log(live_feed_url + "\n");
+            // console.log(live_feed_url + "\n");
             request({
                 method: 'GET',
                 url: live_feed_url
@@ -244,28 +245,59 @@ function search_youtube(params, amount, displayCaptions, callback) {
 //     console.log(data);
 // });
 
-var feed_url = "https://manifest.googlevideo.com/api/manifest/dash/id/uixUv3Ydwt0.2/sparams/as%2Cgcr%2Chfr%2Cid%2Cip%2Cipbits%2Citag%2Cplaylist_type%2Crequiressl%2Csource%2Cexpire/requiressl/yes/key/yt6/gcr/us/expire/1465612957/playlist_type/LIVE/signature/9C74AA542E33A4D96644375DA0A0AEB1CD88C583.25C00E00C153D106A1E478572F59A783653CAFD2/sver/3/fexp/9416126%2C9416891%2C9417580%2C9422596%2C9425569%2C9427768%2C9428398%2C9428520%2C9431012%2C9433092%2C9433096%2C9433380%2C9433425%2C9433946%2C9434087%2C9435188%2C9435252%2C9435526%2C9435780%2C9435876%2C9436102%2C9436275%2C9436998%2C9437066%2C9437283%2C9437552%2C9438657%2C9438955%2C9438965/ip/107.1.143.3/upn/4B9twh7r4GM/source/yt_live_broadcast/itag/0/ipbits/0/as/fmp4_audio_clear%2Cwebm_audio_clear%2Cwebm2_audio_clear%2Cfmp4_sd_hd_clear%2Cwebm2_sd_hd_clear/hfr/1";
+// var feed_url = "https://manifest.googlevideo.com/api/manifest/dash/id/uixUv3Ydwt0.2/sparams/as%2Cgcr%2Chfr%2Cid%2Cip%2Cipbits%2Citag%2Cplaylist_type%2Crequiressl%2Csource%2Cexpire/requiressl/yes/key/yt6/gcr/us/expire/1465612957/playlist_type/LIVE/signature/9C74AA542E33A4D96644375DA0A0AEB1CD88C583.25C00E00C153D106A1E478572F59A783653CAFD2/sver/3/fexp/9416126%2C9416891%2C9417580%2C9422596%2C9425569%2C9427768%2C9428398%2C9428520%2C9431012%2C9433092%2C9433096%2C9433380%2C9433425%2C9433946%2C9434087%2C9435188%2C9435252%2C9435526%2C9435780%2C9435876%2C9436102%2C9436275%2C9436998%2C9437066%2C9437283%2C9437552%2C9438657%2C9438955%2C9438965/ip/107.1.143.3/upn/4B9twh7r4GM/source/yt_live_broadcast/itag/0/ipbits/0/as/fmp4_audio_clear%2Cwebm_audio_clear%2Cwebm2_audio_clear%2Cfmp4_sd_hd_clear%2Cwebm2_sd_hd_clear/hfr/1";
 
-get_live_captions(feed_url, function(err, data) {
-    console.log(JSON.stringify(data, null, 2));
-    // async.eachSeries(data.sq, function(item, cbe) {
-    //     get_live_caption_content(data.baseURL, item, function(err, respc, bodc) {
-    //         console.log(bodc);
-    //         cbe();
-    //     });
-    // });
+var feed_url = "https://manifest.googlevideo.com/api/manifest/dash/ip/107.1.143.3/gcr/us/as/fmp4_audio_clear%2Cwebm_audio_clear%2Cwebm2_audio_clear%2Cfmp4_sd_hd_clear%2Cwebm2_sd_hd_clear/ipbits/0/sparams/as%2Cgcr%2Chfr%2Cid%2Cip%2Cipbits%2Citag%2Cplaylist_type%2Crequiressl%2Csource%2Cexpire/key/yt6/source/yt_live_broadcast/hfr/1/fexp/9413140%2C9416126%2C9416891%2C9419452%2C9422596%2C9428398%2C9429854%2C9431012%2C9432182%2C9432362%2C9432650%2C9432683%2C9433096%2C9433380%2C9433851%2C9433946%2C9435526%2C9435773%2C9435876%2C9435920%2C9436013%2C9436097%2C9436986%2C9437066%2C9437403%2C9437553%2C9438336%2C9438523%2C9438956/id/uixUv3Ydwt0.2/expire/1465868610/upn/igPnsHXdiRg/signature/5CA82733CB9F944FC860857949DCA6820FE50C60.1C0D96F4B3719DD52282B97F408274C8BF0A2505/itag/0/playlist_type/LIVE/requiressl/yes/sver/3";
 
-    // var captions = [];
-    // var sq = 0;
-    // async.whilst(()=>sq < 1000, function(cbwhilst) {
-    async.times(1000, function(sq, cbt) {
-        get_live_caption_content(data.baseURL, sq, function(err, respc, bodc) {
-            cbt(err, bodc);
-            // console.log(bodc);
-            // sq++;
-            // cbwhilst(null);
+var latest_sq = 0;
+var current_sq = 0;
+
+async.forever(function(cbf) {
+    console.log("forever");
+    async.timeout(function(cbt) {
+        get_live_captions(feed_url, function(err, data) {
+            cbt();
+            console.log(JSON.stringify(data, null, 2));
+            async.eachSeries(data.sq, function(item, cbe) {
+                current_sq = sscanf(item, 'sq/%d');
+                if(current_sq > latest_sq) {
+                    console.log("Getting captions")
+                    get_live_caption_content(data.baseURL, item, function(err, respc, bodc) {
+                        console.log(item + "\n" + bodc);
+                        latest_sq = current_sq;
+                        cbe(null);
+                    });
+                }
+                else {
+                    cbe(null);
+                }
+            }, function(err) {
+                console.log("Iteration");
+                setTimeout(() => {console.log("cbf"); cbf(err);}, 2000);
+            });
         });
-    }, function(err, captions) {
-        console.log(captions);
-    });
+    }, 10000, "Timed out")((err) => {console.log("timeout " + JSON.stringify(err)); if(err) cbf(null);});
+}, function(err) {
+    console.log(JSON.stringify(err));
 });
+
+// get_live_captions(feed_url, function(err, data) {
+//     console.log(JSON.stringify(data, null, 2));
+//     async.eachSeries(data.sq, function(item, cbe) {
+//         get_live_caption_content(data.baseURL, item, function(err, respc, bodc) {
+//             console.log(bodc);
+//             cbe();
+//         });
+//     });
+
+//     // async.times(1000, function(sq, cbt) {
+//     //     get_live_caption_content(data.baseURL, sq, function(errc, respc, bodc) {
+//     //         cbt(errc, bodc);
+//     //         // console.log(bodc);
+//     //         // sq++;
+//     //         // cbwhilst(null);
+//     //     });
+//     // }, function(err, captions) {
+//     //     console.log(captions);
+//     // });
+// });
