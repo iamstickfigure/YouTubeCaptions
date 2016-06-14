@@ -241,21 +241,28 @@ function continuous_live_captions(feed_url, verbose) {
                 completed_calls++;
                 cbt(err);
                 // console.log(JSON.stringify(data, null, 2));
-                async.eachSeries(data.sq, function(item, cbe) {
+                async.map(data.sq, function(item, cbm) {
+                    var current_log = "";
                     current_sq = sscanf(item, 'sq/%d');
                     if(current_sq > latest_sq) {
                         get_live_caption_content(data.baseURL, item, function(err, respc, bodc) {
                             completed_calls++;
-                            if(verbose) console.log(item);
-                            console.log(bodc);
+                            if(verbose) {
+                                current_log += item + "\n";
+                            }
+                            current_log += bodc + "\n";
+                            // console.log("current_log " + current_log);
                             latest_sq = current_sq;
-                            cbe(null);
+                            cbm(null, current_log);
                         });
                     }
                     else {
-                        cbe(null);
+                        cbm(null, "");
                     }
-                }, function(err) {
+                }, function(err, logs) {
+                    for(key in logs) {
+                        console.log(logs[key]);
+                    }
                     setTimeout(() => cbf(err), 5000);
                 });
             });
@@ -279,10 +286,9 @@ function continuous_live_captions(feed_url, verbose) {
 //     // pageToken: 'CDIQAA'
 //     // q: "HSN Livestream"
 // }, 1000, false, null);
-
-get_livestream_feed("uixUv3Ydwt0", function(err, feed_url) {
+get_livestream_feed("uixUv3Ydwt0", function(err, feed_url) { // HSN Livestream: "uixUv3Ydwt0"  (Only consistent captioned livestream)
     console.log(feed_url);
-    continuous_live_captions(feed_url, false);
+    continuous_live_captions(feed_url, true);
 });
 
 // var feed_url = "https://manifest.googlevideo.com/api/manifest/dash/ip/107.1.143.3/gcr/us/as/fmp4_audio_clear%2Cwebm_audio_clear%2Cwebm2_audio_clear%2Cfmp4_sd_hd_clear%2Cwebm2_sd_hd_clear/ipbits/0/sparams/as%2Cgcr%2Chfr%2Cid%2Cip%2Cipbits%2Citag%2Cplaylist_type%2Crequiressl%2Csource%2Cexpire/key/yt6/source/yt_live_broadcast/hfr/1/fexp/9413140%2C9416126%2C9416891%2C9419452%2C9422596%2C9428398%2C9429854%2C9431012%2C9432182%2C9432362%2C9432650%2C9432683%2C9433096%2C9433380%2C9433851%2C9433946%2C9435526%2C9435773%2C9435876%2C9435920%2C9436013%2C9436097%2C9436986%2C9437066%2C9437403%2C9437553%2C9438336%2C9438523%2C9438956/id/uixUv3Ydwt0.2/expire/1465868610/upn/igPnsHXdiRg/signature/5CA82733CB9F944FC860857949DCA6820FE50C60.1C0D96F4B3719DD52282B97F408274C8BF0A2505/itag/0/playlist_type/LIVE/requiressl/yes/sver/3";
