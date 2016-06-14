@@ -25,17 +25,25 @@ function get_asr_captions(videoId, callback) {
         function(respyt, bodyt, cbw) {
             // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]+)"/);
             // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr[^"]*)"/);
-            var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr.*?)\\u\d+.*"/);
-            if (results)
-                cbw(null, decodeURIComponent(results[1]));
+            // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr.*?)\\u\d+.*"/);
+            var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr.*?)(\\u\d+.*?)?"/);
+            if(results) console.log("Results " + results[1]);
+            if(results) 
+                cbw(null, decodeURIComponent(results[1]).replace(/\&amp\;/g, "&")); //.replace(/\&amp\;/g, "&")
             else
                 cbw("Couldn't Find any ASR tracks");
         }
     ], function(err, asr_url) {
-        request({
-            method: 'GET',
-            url: asr_url
-        }, callback);
+        if(err) {
+            // console.log("\n\n\n\n\n\n\n\n+++++++++++++++\nCaptions unavailable\n+++++++++++++++\n\n\n\n\n\n\n\n");
+            callback(err);
+        }
+        else {
+            request({
+                method: 'GET',
+                url: asr_url
+            }, callback);
+        }
     });
 }
 
@@ -84,6 +92,7 @@ function get_caption_content(params, callback) {
 }
 
 function get_english_caption(videoId, callback) {
+    if(true || videoId == "2-wroLYs6Fw") {
     async.waterfall([
         function(cbw) {
             get_caption_details(videoId, function(errcd, respcd, bodcd) {
@@ -121,7 +130,7 @@ function get_english_caption(videoId, callback) {
                 v: videoId
             };
             if(!english_caption)
-                cbw(`\n\n\n\n\n\n\n\n+++++++++++++\nNo English Captions\n+++++++++++++++\n${videoId}\n\n\n\n\n\n\n`);
+                cbw(`\n\n\n\n\n\n\n\n+++++++++++++++++\nNo English Captions\n+++++++++++++++\n${videoId}\n\n\n\n\n\n\n`);
             else if(english_caption.trackKind == "standard"){
                 // console.log("Captions: "  + JSON.stringify(english_caption));
                 if(english_caption.snippet.name != '')
@@ -141,16 +150,21 @@ function get_english_caption(videoId, callback) {
                     if(errc) console.log(errc);
                     console.log("\n============================ASR==============================\n");
                     console.log(videoId + '\n');
-                    console.log(bodc);
+                    if(bodc)
+                        console.log(bodc);
+                    else
+                        console.log("\n\n\n\n\n\n\n\n+++++++++++++++\nCaptions unavailable\n+++++++++++++++\n\n\n\n\n\n\n\n");
                     // cbw(null, bodc);
                     cbw(null);
                 });
             }
         }
-    ], callback);
+    ], callback);}
+    else
+        callback();
 }
 
-function search_youtube(params, amount, callback) {
+function search_youtube(params, amount, displayCaptions, callback) {
     async.whilst(()=>amount > 0, function(cbwhilst) {
         var options = {
             method: 'GET',
@@ -170,9 +184,7 @@ function search_youtube(params, amount, callback) {
         console.log(JSON.stringify(options, null, 2));
         async.waterfall([
             function(cbw) {
-                if(!params.channelId) {
-                    if(!params.username)
-                        throw new Error("channelId or username required");
+                if(!params.channelId && params.username) {
                     get_channel_ID(params.username, cbw);
                 }
                 else
@@ -189,18 +201,24 @@ function search_youtube(params, amount, callback) {
             },
             function(respv, bodv, cbw) {
                 // console.log(JSON.stringify(bodv, null, 2));
-                async.each(bodv.items, function(item, cbe) {
-                    get_english_caption(item.id.videoId, cbe);
-                }, function(err, data) {
-                    if(err) console.log(err);
+                if(displayCaptions) {
+                    async.each(bodv.items, function(item, cbe) {
+                        if(item.id.videoId == '2-wroLYs6Fw')
+                            console.log(JSON.stringify(item, null, 2));
+                        get_english_caption(item.id.videoId, cbe);
+                    }, function(err, data) {
+                        if(err) console.log(err);
+                        cbw(null, bodv);
+                    });
+                }
+                else
                     cbw(null, bodv);
-                });
             }
         ], function(err, data) {
             amount -= 50;
             console.log("\nNext Page: " + data.nextPageToken);
             params.pageToken = data.nextPageToken;
-            if(!params.pageToken)
+            if(!params.pageToken || data.items.length == 0)
                 amount = 0;
             cbwhilst(err);
         });
@@ -217,8 +235,8 @@ function search_youtube(params, amount, callback) {
 allowASR = true;
 
 search_youtube({
-    username: "JoergSprave",
+    // username: "JoergSprave",
     order: "date",
     // pageToken: 'CDIQAA'
     // q: "after the unemployment rate declines below"
-}, 1, null);
+}, 100, true, null);
