@@ -146,6 +146,8 @@ function get_english_caption(videoId, callback) {
                     console.log("\n============================STANDARD==============================\n");
                     console.log(videoId + '\n');
                     console.log(bodc);
+                    if(bodc.trim() == "") 
+                        console.log("\n\n\n\n\n\n\n\n++++++++++++++++++++\nCaptions unavailable\n++++++++++++++++++++\n\n\n\n\n\n\n\n");
                     // cbw(null, bodc);
                     cbw(null);
                 });
@@ -235,13 +237,16 @@ function search_youtube(params, amount, displayCaptions, callback) {
 // channelId: 'UC9-y-6csu5WGm29I7JiwpnA', // Computerphile
 // channelId: 'UCIsp57CkuqoPQyHP2B2Y5NA', // MillBeeful
 
-allowASR = true;
+allowASR = false;
 
 search_youtube({
     // username: "JoergSprave",
     // username: "wheeloffortune",
-    username: "numberphile",
+    // username: "numberphile",
+    // username: "EthosLab",
+    // username: "BlueXephos",
+    // username: "SSoHPKC",
     order: "date",
     // pageToken: 'CDIQAA'
     // q: "after the unemployment rate declines below"
-}, 100, true, null);
+}, 1000, true, null);
