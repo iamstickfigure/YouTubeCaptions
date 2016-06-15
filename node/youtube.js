@@ -32,10 +32,11 @@ function get_asr_captions(videoId, callback) {
             // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]+)"/);
             // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr[^"]*)"/);
             // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr.*?)\\u\d+.*"/);
-            var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr.*?)(\\u\d+.*?)?"/);
+            // var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*"[^"]*(https[^"]*kind(%[A-F0-9][A-F0-9])+asr.*?)(\\u\d+.*?)?"/);
+            var results = bodyt.match(/"\s*caption_tracks\s*"\s*:\s*".*?(https.*?kind(%[A-F0-9][A-F0-9])+?asr.*?)"/);
             // if(results) console.log("Results " + results[1]);
             if(results) 
-                cbw(null, decodeURIComponent(results[1]).replace(/\&amp\;/g, "&")); //.replace(/\&amp\;/g, "&")
+                cbw(null, decodeURIComponent(results[1]).replace(/\\u\d+.*/g, "")); //.replace(/\&amp\;/g, "&")
             else
                 cbw("Couldn't Find any ASR tracks");
         }
@@ -241,6 +242,8 @@ function get_english_caption(videoId, callback) {
 }
 
 function search_youtube(params, amount, displayCaptions, callback) {
+    var total_videos = 0;
+
     async.whilst(()=>amount > 0, function(cbwhilst) {
         var options = {
             method: 'GET',
@@ -294,6 +297,7 @@ function search_youtube(params, amount, displayCaptions, callback) {
             }
         ], function(err, data) {
             amount -= 50;
+            total_videos += data.items.length;
             console.log(JSON.stringify(data, null, 2));
             console.log("\nNext Page: " + data.nextPageToken);
             params.pageToken = data.nextPageToken;
@@ -302,6 +306,7 @@ function search_youtube(params, amount, displayCaptions, callback) {
             cbwhilst(err);
         });
     }, function(err) {
+        console.log(`\n\n\n\n\n\n\n\n+++++++++++++++++++++++++++++++\nSearch ended at ${total_videos} videos\n+++++++++++++++++++++++++++++++\n\n\n\n\n\n\n\n`);
         if(callback)
             callback(err);
     });
@@ -357,7 +362,7 @@ function continuous_live_captions(feed_url, verbose) {
 // channelId: 'UC9-y-6csu5WGm29I7JiwpnA', // Computerphile
 // channelId: 'UCIsp57CkuqoPQyHP2B2Y5NA', // MillBeeful
 
-allowASR = false;
+allowASR = true;
 
 search_youtube({
     // username: "JoergSprave",
@@ -365,7 +370,7 @@ search_youtube({
     // username: "numberphile",
     // username: "EthosLab",
     // username: "BlueXephos",
-    // username: "SSoHPKC",
+    username: "SSoHPKC",
     order: "date",
     // pageToken: 'CDIQAA'
     // q: "after the unemployment rate declines below"
@@ -379,10 +384,11 @@ search_youtube({
 //     // pageToken: 'CDIQAA'
 //     // q: "HSN Livestream"
 // }, 1000, false, null);
-get_livestream_feed("uixUv3Ydwt0", function(err, feed_url) { // HSN Livestream: "uixUv3Ydwt0"  (Only consistent captioned livestream)
-    console.log(feed_url);
-    continuous_live_captions(feed_url, true);
-});
+
+// get_livestream_feed("uixUv3Ydwt0", function(err, feed_url) { // HSN Livestream: "uixUv3Ydwt0"  (Only consistent captioned livestream)
+//     console.log(feed_url);
+//     continuous_live_captions(feed_url, true);
+// });
 
 // var feed_url = "https://manifest.googlevideo.com/api/manifest/dash/ip/107.1.143.3/gcr/us/as/fmp4_audio_clear%2Cwebm_audio_clear%2Cwebm2_audio_clear%2Cfmp4_sd_hd_clear%2Cwebm2_sd_hd_clear/ipbits/0/sparams/as%2Cgcr%2Chfr%2Cid%2Cip%2Cipbits%2Citag%2Cplaylist_type%2Crequiressl%2Csource%2Cexpire/key/yt6/source/yt_live_broadcast/hfr/1/fexp/9413140%2C9416126%2C9416891%2C9419452%2C9422596%2C9428398%2C9429854%2C9431012%2C9432182%2C9432362%2C9432650%2C9432683%2C9433096%2C9433380%2C9433851%2C9433946%2C9435526%2C9435773%2C9435876%2C9435920%2C9436013%2C9436097%2C9436986%2C9437066%2C9437403%2C9437553%2C9438336%2C9438523%2C9438956/id/uixUv3Ydwt0.2/expire/1465868610/upn/igPnsHXdiRg/signature/5CA82733CB9F944FC860857949DCA6820FE50C60.1C0D96F4B3719DD52282B97F408274C8BF0A2505/itag/0/playlist_type/LIVE/requiressl/yes/sver/3";
 
